@@ -1,3 +1,2 @@
-user_id,chat_id,lang,status,last_message,current_status,birthdays,username
-978440562,978440562,,get_lang,,,,
-366321052,366321052,eng,menu,254,,,Brh
+user_id,chat_id,status,last_message,lang,username,location,birthdays,all_tasks,current_tasks,done_tasks,deleted_tasks
+366321052,366321052,menu,654,eng,Bruh,"[38.83998, 65.7927948]",,"{1: 'finishing tasks feature', 2: 'finish done feat', 3: 'finish delete feat', 4: 'bruh', 5: 'bruh', 6: 'burh2', 7: 'burh', 8: 'asd'}",{},"{1: 'finishing tasks feature', 3: 'finish delete feat', 2: 'finish done feat', 4: 'bruh', 6: 'burh2', 5: 'bruh', 7: 'burh', 8: 'asd'}",{}
