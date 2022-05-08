@@ -1,7 +1,9 @@
-import ast
-from email import message
-from threading import currentThread 
-import requests, json 
+from asyncio import all_tasks
+from datetime import datetime
+from operator import index
+from tracemalloc import start
+from numpy import character
+import requests, json, ast, time
 import telebot 
 from  constants import *
 import pandas as pd
@@ -79,7 +81,7 @@ def to_do_inline_keyboard_maker(tasks):
     buttons = []
     if tasks:
         for key, value in tasks.items():
-            buttons.append([types.InlineKeyboardButton(text=value, callback_data="task {}".format(key))])
+            buttons.append([types.InlineKeyboardButton(text=f'"{value}"', callback_data="task {}".format(key))])
             edit_btns = []
             edit_btns.append(types.InlineKeyboardButton(callback_data="done {}".format(key), text="✅ done"))
             edit_btns.append(types.InlineKeyboardButton(callback_data="delete {}".format(key), text="🗑 remove"))
@@ -92,7 +94,22 @@ def to_do_inline_keyboard_maker(tasks):
     markup = types.InlineKeyboardMarkup(buttons)
     return markup
 
-
+def birthdays_inline_maker(birthdays):
+    buttons = []
+    for name, date in birthdays.keys():
+        date = date_prettier(date)
+        buttons.append([types.InlineKeyboardButton(text="{} | {}".format(name, date), 
+            callback_data='birthday {}'.format(birthdays.keys().index(name)))])
+    navigation = []
+    for item, value in texts[user_lang]['birth_pagination_btns'].items():
+        navigation.append(types.InlineKeyboardButton(text=value, callback_data=item))
+    buttons.append(navigation)
+    for item, value in texts[user_lang]['go_back_btn'].items():
+        buttons.append([types.InlineKeyboardButton(text=value, callback_data=item)])
+    
+    markup = types.InlineKeyboardMarkup(buttons)
+    return markup
+    
 def keyboard_button_maker(btns, request_location=False):
     markup = types.ReplyKeyboardMarkup()
     for btn in btns:
@@ -107,6 +124,12 @@ def check_username(text):
     else:
         return False 
 
+def markdown_escaper(text):
+    escaping_chars = ['[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in escaping_chars:
+        text = text.replace(char, '\{}'.format(char))
+    return text
+
 def check_city(text):
     content_list = json.loads(requests.get(city_loc_checker_url.format(text, OW_API_KEY)).content)
     if len(content_list) != 0:
@@ -115,6 +138,20 @@ def check_city(text):
         return message_text, content
     else:
         return "unknown", None
+
+def time_prettier(time):
+    datetime_text = str(datetime.fromtimestamp(time))
+    datetext = datetime_text.split(" ")[0]
+    timetext = datetime_text.split(" ")[1].split(".")[0][:-3]
+    
+    time_text = "{},  {}".format(timetext, datetext)
+    print(time_text)
+    return time_text
+
+def date_prettier(time):
+    datetime_text = str(datetime.fromtimestamp(time))
+    datetext = datetime_text.split(" ")[0]
+    return datetext
 
 @bot.message_handler(commands=['start'])
 def start_handler(message):
@@ -130,9 +167,13 @@ def start_handler(message):
         user_data["status"] = status
         user_data["last_message"] = None
         user_data['all_tasks'] = "{}"
+        user_data['all_tasks_time'] = "{}"
         user_data['current_tasks'] = "{}"
+        user_data['current_tasks_time'] = "{}"
         user_data['done_tasks'] = "{}"
         user_data['deleted_tasks'] = "{}"
+        user_data['birthdays'] = "{}"
+        user_data['birtday_page_num'] = 1
         save_user_data(user_data, status)
     else:
         status = "menu"
@@ -303,38 +344,57 @@ def todolist_handler(call=None, message=None):
 @bot.callback_query_handler(func=lambda call: call.data == "add_task")
 def add_task_call_handler(call):
     get_user_data(call=call)
-    delete_last_message_wait(call=call)
-    delete_last_message(call=call)
-    last_message = bot.send_message(chat_id=call.message.chat.id, text=texts[user_lang]['task_name'],
-        reply_markup=inline_keyboard_maker(texts[user_lang]['go_back_btn']))
-    user_data['last_message'] = last_message.message_id
-    status = "add_task"
-    save_user_data(user_data, status)
+    current_tasks = ast.literal_eval(user_data['current_tasks'])
+    if len(current_tasks) >= 5:
+        bot.answer_callback_query(callback_query_id=call.id, text=texts[user_lang]['no_more_tasks'], 
+            show_alert=True)
+    else:
+        delete_last_message_wait(call=call)
+        delete_last_message(call=call)
+        last_message = bot.send_message(chat_id=call.message.chat.id, text=texts[user_lang]['task_name'],
+            reply_markup=inline_keyboard_maker(texts[user_lang]['go_back_btn']))
+        user_data['last_message'] = last_message.message_id
+        status = "add_task"
+        save_user_data(user_data, status)
 
 def add_task_handler(message):
+    created_time = time.time()
     delete_last_message_wait(message=message)
     delete_last_message(message=message)
     task_name = message.text
     all_tasks = ast.literal_eval(user_data["all_tasks"])
+    all_tasks_time = ast.literal_eval(user_data["all_tasks_time"])
     current_tasks = ast.literal_eval(user_data["current_tasks"])
+    current_tasks_time = ast.literal_eval(user_data["current_tasks_time"])
     task_id = len(all_tasks) + 1
     all_tasks[task_id] = task_name
+    all_tasks_time[task_id] = f"{created_time}-"
     current_tasks[task_id] = task_name
+    current_tasks_time[task_id] = created_time
     user_data["all_tasks"] = str(all_tasks)
+    user_data["all_tasks_time"] = str(all_tasks_time)
     user_data["current_tasks"] = str(current_tasks)
+    user_data["current_tasks_time"] = str(current_tasks_time)
     status = 'to-do-list'
     save_user_data(user_data, status)
     return todolist_handler(message=message)
     
 @bot.callback_query_handler(func=lambda call:call.data.startswith("done "))
 def done_task_handler(call):
+    done_time = time.time()
     get_user_data(call=call)
     task_id = int(call.data.split(" ")[1])
     current_tasks = ast.literal_eval(user_data["current_tasks"])
+    current_tasks_time = ast.literal_eval(user_data['current_tasks_time'])
+    all_tasks_time = ast.literal_eval(user_data["all_tasks_time"])
     done_tasks = ast.literal_eval(user_data['done_tasks'])
     done_tasks[task_id] = current_tasks[task_id]
+    all_tasks_time[task_id] = all_tasks_time[task_id] + str(done_time)
+    del current_tasks_time[task_id]
     del current_tasks[task_id]
     user_data['current_tasks'] = str(current_tasks)
+    user_data["current_tasks_time"] = str(current_tasks_time)
+    user_data["all_tasks_time"] = str(all_tasks_time)
     user_data['done_tasks'] = str(done_tasks)
     bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, 
         reply_markup=to_do_inline_keyboard_maker(tasks=current_tasks))
@@ -342,23 +402,69 @@ def done_task_handler(call):
 
 @bot.callback_query_handler(func=lambda call:call.data.startswith("delete "))
 def done_task_handler(call):
+    deleted_time = time.time()
     get_user_data(call=call)
     task_id = int(call.data.split(" ")[1])
     current_tasks = ast.literal_eval(user_data["current_tasks"])
-    deleted_tasks = ast.literal_eval(user_data['done_tasks'])
+    current_tasks_time = ast.literal_eval(user_data['current_tasks_time'])
+    all_tasks_time = ast.literal_eval(user_data['all_tasks_time'])
+    deleted_tasks = ast.literal_eval(user_data['deleted_tasks'])
     deleted_tasks[task_id] = current_tasks[task_id]
+    all_tasks_time[task_id] = all_tasks_time[task_id] + str(deleted_time)
+    del current_tasks_time[task_id]
     del current_tasks[task_id]
     user_data['current_tasks'] = str(current_tasks)
-    user_data['done_tasks'] = str(deleted_tasks)
+    user_data["current_tasks_time"] = str(current_tasks_time)
+    user_data['all_tasks_time'] = str(all_tasks_time)
+    user_data['deleted_tasks'] = str(deleted_tasks)
     bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id, 
         reply_markup=to_do_inline_keyboard_maker(tasks=current_tasks))
     save_user_data(user_data, status)
 
+@bot.callback_query_handler(func=lambda call:call.data.startswith("task "))
+def task_info_handler(call):
+    get_user_data(call=call)
+    delete_last_message_wait(call=call)
+    task_id = int(call.data.split(" ")[1])
+    all_tasks = ast.literal_eval(user_data['all_tasks'])
+    all_tasks_time = ast.literal_eval(user_data['all_tasks_time'])
+    task_text = all_tasks[task_id]
+    task_time = all_tasks_time[task_id]
+    start_time = time_prettier(float(task_time.split("-")[0]))
+    
+    end_time = task_time.split("-")[1]
+    if end_time != '':
+        end_time = float(end_time)
+    message_text = texts[user_lang]['task_info_text'].format(task_text, start_time, end_time)
+    message_text = markdown_escaper(message_text)
+    delete_last_message(call=call)
+    last_message = bot.send_message(chat_id=call.message.chat.id, text=message_text, 
+        reply_markup=inline_keyboard_maker(texts[user_lang]['go_back_btn']),
+        parse_mode="MarkdownV2")
+    user_data['last_message'] = last_message.message_id
+    status = "task_info"
+    save_user_data(user_data, status)
 
+
+#birthdays
 @bot.callback_query_handler(func=lambda call: call.data=="birthdays")
 def birthdays_handler(call=None, message=None):
-    None
+    get_user_data(call=call, message=message)
+    delete_last_message_wait(call=call, message=message)
+    delete_last_message(call=call, message=message)
+    birthdays = ast.literal_eval(user_data['birthdays'])
+    birthdays
+    last_message = bot.send_message(chat_id=call.message.chat.id, 
+        text=texts[user_lang]['birthdays_text'], 
+        reply_markup=birthdays_inline_maker(birthdays))
+    user_data["last_message"] = last_message.message_id
+    status = "birthdays"
+    save_user_data(user_data, status)
 
+
+
+
+#weathers
 @bot.callback_query_handler(func=lambda call: call.data=="weather")
 def weather_handler(call=None, message=None):
     None
@@ -407,9 +513,10 @@ def message_handler(message):
 @bot.callback_query_handler(func=lambda call: call.data == "go_back")
 def go_back(call):
     get_user_data(call=call)
+    print(status, " back")
     if status in ["to-do-list"]:
         return menu_maker(call=call)
-    elif status == "add_tisk":
+    elif status in ["add_task", "task_info"]:
         return todolist_handler(call=call)
 
 bot.infinity_polling()

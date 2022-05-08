@@ -37,8 +37,13 @@ texts = {
         "to-do_add":{"add_task":"➕ Add task"},
         "to_do_done":{"done_task {}":"✅ done"},
         "to-do_remove":{"remove_task {}":"🗑 remove"},
+        "no_more_tasks":"❗️ You cannot add more than 5 tasks",
         "task_name":"Send the name of the task",
-
+        "task_info_text":"*Task name:*  {}\n*Task created time:*  {}\n*Task ended time:*  {}",
+        #birthdays
+        "birthdays_text":"🎁 Birthdays",
+        "birth_pagination_btns":{"go_back_birth":"<<",  "page_state":"{}/{}", "go_forward_birth":">>"},
+        
     },
     "uz":{}
 }
