@@ -526,7 +526,7 @@ def getMessage():
 @server.route("/")
 def webhook():
     bot.remove_webhook()
-    bot.set_webhook(url='https://crocktestbot1.herokuapp.com/' + API_KEY)
+    bot.set_webhook(url='https://crocktelegrambot.herokuapp.com/' + API_KEY)
     return "!", 200
 
 
