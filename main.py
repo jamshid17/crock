@@ -1,17 +1,13 @@
-from asyncio import all_tasks
 from datetime import datetime
-from operator import index
-from tracemalloc import start
-from numpy import character
-import requests, json, ast, time
-import telebot 
+import telebot, requests, json, ast, time, os 
 from  constants import *
 import pandas as pd
 from telebot import types
-
+from flask import Flask, request
 
 
 bot = telebot.TeleBot(API_KEY)
+# server = Flask(__name__)
 pd.set_option('mode.chained_assignment', None)
 users_data = pd.read_csv("db/users_data.csv")
 
@@ -462,8 +458,6 @@ def birthdays_handler(call=None, message=None):
     save_user_data(user_data, status)
 
 
-
-
 #weathers
 @bot.callback_query_handler(func=lambda call: call.data=="weather")
 def weather_handler(call=None, message=None):
@@ -519,4 +513,23 @@ def go_back(call):
     elif status in ["add_task", "task_info"]:
         return todolist_handler(call=call)
 
-bot.infinity_polling()
+
+
+# #servering
+# @server.route('/' + API_KEY, methods=['POST'])
+# def getMessage():
+#     json_string = request.get_data().decode('utf-8')
+#     update = telebot.types.Update.de_json(json_string)
+#     bot.process_new_updates([update])
+#     return "!", 200
+
+# @server.route("/")
+# def webhook():
+#     bot.remove_webhook()
+#     bot.set_webhook(url='https://your_heroku_project.com/' + API_KEY)
+#     return "!", 200
+
+
+# if __name__ == "__main__":
+#     server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
+# # bot.infinity_polling()
