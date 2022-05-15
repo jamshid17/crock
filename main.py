@@ -7,7 +7,7 @@ from flask import Flask, request
 
 
 bot = telebot.TeleBot(API_KEY)
-# server = Flask(__name__)
+server = Flask(__name__)
 pd.set_option('mode.chained_assignment', None)
 users_data = pd.read_csv("db/users_data.csv")
 
@@ -515,21 +515,21 @@ def go_back(call):
 
 
 
-# #servering
-# @server.route('/' + API_KEY, methods=['POST'])
-# def getMessage():
-#     json_string = request.get_data().decode('utf-8')
-#     update = telebot.types.Update.de_json(json_string)
-#     bot.process_new_updates([update])
-#     return "!", 200
+#servering
+@server.route('/' + API_KEY, methods=['POST'])
+def getMessage():
+    json_string = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return "!", 200
 
-# @server.route("/")
-# def webhook():
-#     bot.remove_webhook()
-#     bot.set_webhook(url='https://your_heroku_project.com/' + API_KEY)
-#     return "!", 200
+@server.route("/")
+def webhook():
+    bot.remove_webhook()
+    bot.set_webhook(url='https://crocktestbot1.herokuapp.com/' + API_KEY)
+    return "!", 200
 
 
-# if __name__ == "__main__":
-#     server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
-# # bot.infinity_polling()
+if __name__ == "__main__":
+    server.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)))
+# bot.infinity_polling()
